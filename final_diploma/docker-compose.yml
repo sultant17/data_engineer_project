@@ -1,0 +1,68 @@
+version: '3.10'
+
+services:
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=stdb
+      - POSTGRES_DB=airflow
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U airflow" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - minenet
+
+  scheduler:
+    image: apache/airflow:2.5.0-python3.9
+    container_name: airflow-scheduler
+    entrypoint: /opt/airflow/scripts/entrypoint.sh
+    deploy:
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    volumes:
+      - ./airflow:/opt/airflow
+    networks:
+      - minenet
+
+  webserver:
+    image: apache/airflow:2.5.0-python3.9
+    container_name: airflow-webserver
+    command: webserver
+    deploy:
+      restart_policy:
+        condition: on-failure
+    depends_on:
+      - postgres
+      - scheduler
+    env_file:
+      - .env
+    volumes:
+      - ./airflow:/opt/airflow
+    ports:
+      - 8080:8080
+    networks:
+      - minenet
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8081:8080"
+    networks:
+      - minenet
+
+networks:
+  minenet:
+    driver: bridge
